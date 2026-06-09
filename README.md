@@ -1,68 +1,148 @@
-# btc-blueprint ⛓️
+# Gitops Training Labs
 
-![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat&logo=go)
-![License](https://img.shields.io/badge/License-MIT-blue.svg)
+Lab GitOps trên ArgoCD: **App-of-Apps + ApplicationSet** nhiều tầng, multi-source, **1 base Helm chart dùng chung**.
+Single branch (`main`), directory-based. Tách **2 tier theo cluster**:
 
-> A modular, deep-dive implementation of a Bitcoin-like blockchain in pure Go. 
+- **`root-nonproduction`** → quản lý **dev + staging** (apply lên ArgoCD của cluster nonprod)
+- **`root-production`** → quản lý **prod** (apply lên ArgoCD của cluster prod)
 
-This repository is not a "toy blockchain". It is built from the ground up as a practical companion to Andreas M. Antonopoulos's *Mastering Bitcoin*, focusing heavily on the core distributed systems and cryptographic engineering concepts that make Bitcoin work.
+> Mỗi cluster có ArgoCD riêng (per-cluster), mọi destination = in-cluster. 2 tier giống hệt nhau,
+> chỉ khác **env filter** (nonproduction = dev+staging, production = prod).
 
-## 🎯 Core Features & Deep Dives
-
-Unlike basic blockchain tutorials, this project implements the true architectural pillars of Bitcoin:
-
-- **UTXO Transaction Model:** Pure Unspent Transaction Output architecture using ECDSA (secp256k1) and Base58Check encoding.
-- **Fee-Prioritized Mempool:** Transactions are not blindly mined. The mempool prioritizes and sorts pending transactions based on their `Fee-per-Byte` ratio, maximizing miner profitability.
-- **Stack-based Script VM:** A minimal Virtual Machine built from scratch to parse and execute Bitcoin's Stack-based Scripting Language (specifically targeting `P2PKH` - Pay-to-Public-Key-Hash).
-- **SPV Light Client (Merkle Proofs):** Implements Simplified Payment Verification (SPV). The light client verifies transactions using Merkle Paths and Block Headers without downloading the entire blockchain state.
-- **P2P Network Protocol:** Custom TCP-based peer-to-peer networking using Go routines and channels to handle node discovery, mempool syncing, and longest-chain consensus.
-
-## 📂 Repository Structure
-
-The project follows a standard Go modular layout:
-
-```text
-btc-from-scratch/
-├── cmd/
-│   ├── miner/             # Full Node daemon with Proof-of-Work mining capabilities
-│   ├── spv-client/        # Light Node daemon (downloads headers only)
-│   └── cli/               # Command-line wallet interface for key gen and tx creation
-├── pkg/
-│   ├── wallet/            # ECDSA cryptography, Base58Check, Address generation
-│   ├── script/            # Stack-based VM for OP_CODE execution (OP_DUP, OP_CHECKSIG, etc.)
-│   ├── transaction/       # TxIn, TxOut, UTXO Set management, and Mempool logic
-│   ├── blockchain/        # Block architecture, Merkle Tree construction, State management
-│   ├── consensus/         # Proof-of-Work algorithm, Difficulty target adjustment
-│   └── p2p/               # TCP peer-to-peer synchronization and message protocols
-└── docker-compose.yml     # Local P2P testnet simulation
+## Phân tầng (mỗi tier)
 
 ```
+root-<tier> (App, recurse:false → chỉ đọc 6 file cấp 1 của bootstrap/<tier>)
+├── appprojects    (appset) ──► App/appproject-<proj> ──► AppProject        (wave -2)
+├── platform       (appset) ──► sealed-secrets + kgateway-crds (CRDs, có SSA) (wave -1)
+├── kgateway       (App)    ──► kgateway controller (v2.4.0-main, KHÔNG SSA)  (wave 0)
+├── all-projects   (appset) ──► App/projectset-<proj> ──► appset của project (wave 0)
+│                                   └─► workload Application (theo env của tier)
+├── shared-gateway (App)    ──► Gateway shared-gw (*.duongot.work, dùng chung) (wave 1)
+└── httproutes     (App)    ──► HTTPRoute đứng riêng (vd argocd) ──► shared-gw  (wave 2)
+```
 
-## 🗺️ Roadmap (Long-term Vision)
+> kgateway controller tách khỏi `platform` appset vì cài **KHÔNG ServerSideApply** (còn CRDs **có** SSA) —
+> đúng pattern cài kgateway trên ArgoCD; appset (template đồng nhất) không đặt syncOptions per-element được.
 
-This project is actively being developed. The current roadmap:
+> ApplicationSet chỉ sinh được **Application**, nên "appset quản lý AppProject / quản lý appset con"
+> đều dùng App-of-Apps gián tiếp: appset → App → (AppProject | ApplicationSet) manifest.
 
-* [ ] **Phase 1: Cryptography & Data Structures** (Wallet, Hash functions, Block & Merkle Tree structs).
-* [ ] **Phase 2: Transactions & VM** (UTXO logic, Mempool creation, Stack-based Script execution).
-* [ ] **Phase 3: Consensus & Mining** (PoW implementation, block rewarding, fee calculation).
-* [ ] **Phase 4: Networking** (P2P protocol, state synchronization, handling orphan blocks).
-* [ ] **Phase 5: SPV Integration** (Light client implementation and Merkle Proof verification).
+## Cấu trúc thư mục
 
-## 🚀 Getting Started
+```
+main
+├── root-nonproduction.yaml          # apply lên ArgoCD cluster nonprod
+├── root-production.yaml             # apply lên ArgoCD cluster prod
+├── bootstrap/
+│   ├── nonproduction/               # production/ = bản sao, chỉ khác env filter
+│   │   ├── appprojects.yaml          (appset)         ┐ 6 file cấp 1
+│   │   ├── platform.yaml             (appset)         │ (root đọc, recurse:false)
+│   │   ├── kgateway.yaml             (App)            │
+│   │   ├── all-projects.yaml         (appset)         │
+│   │   ├── shared-gateway.yaml       (App)            │
+│   │   ├── httproutes.yaml           (App)            ┘
+│   │   ├── appprojects/{platform,birdnet-market,mention-mate}/appproject.yaml
+│   │   └── project-appsets/{birdnet-market,mention-mate}/applicationset.yaml
+│   └── production/ ...
+├── platform/gateway/               # shared-gw DÙNG CHUNG: GatewayParameters + Gateway *.duongot.work
+├── platform/httproutes/            # HTTPRoute đứng riêng (argocd...) trỏ shared-gw
+├── helm-charts/app/                 # 1 base chart duy nhất
+└── apps/<project>/<app>/overlays/<env>/values.yaml
+```
 
-*(Instructions will be updated as the networking phase is completed)*
-
-To spin up a local testnet simulation with 3 Miners and 1 SPV Client:
+## Bootstrap
 
 ```bash
-# Clone the repository
-git clone [https://github.com/yourusername/btc-from-scratch.git](https://github.com/yourusername/btc-from-scratch.git)
-cd btc-from-scratch
-
-# Start the P2P network simulation
-docker-compose up --build
+# trên ArgoCD của cluster nonprod
+kubectl apply -f root-nonproduction.yaml
+# trên ArgoCD của cluster prod
+kubectl apply -f root-production.yaml
 ```
-## 📚 References
 
-* [Mastering Bitcoin (2nd Edition)](https://github.com/bitcoinbook/bitcoinbook) by Andreas M. Antonopoulos.
-* [Bitcoin Core Source Code](https://github.com/bitcoin/bitcoin)
+| Project | Apps | nonprod (dev+staging) | prod |
+|---|---|---|---|
+| birdnet-market | frontend, backend | 4 | 2 |
+| mention-mate | app (backend+worker) | 2 | 1 |
+
+→ **6 Application** trên cluster nonprod, **3** trên cluster prod. Application = `{project}-{app}-{env}`,
+namespace = `{project}-{env}`, AppProject = `{project}`.
+
+## Base chart `app`
+
+1 chart cho mọi app, render theo map `components`:
+
+- mỗi component → 1 **Deployment** (+ **Service** nếu có `port`, + **ConfigMap** nếu có `config`, + **HTTPRoute** nếu `httpRoute.enabled`)
+- 1 component = single-deployment; nhiều component = multi-deployment
+- **1 SealedSecret** dùng chung cho cả release; HTTPRoute gắn vào **Gateway dùng chung** `shared-gw`
+
+Mỗi workload Application multi-source, **cả hai cùng `main`**: `source[0]` = `helm-charts/app`, `source[1]` = `values.yaml` của env (`$values`).
+Cấu trúc `components` đầy đủ: xem `helm-charts/app/values.yaml`.
+
+## Thêm mới
+
+- **Thêm env**: tạo `apps/<project>/<app>/overlays/<env>/values.yaml` + thêm path env vào appset của project ở tier tương ứng.
+- **Thêm app**: tạo `apps/<project>/<newapp>/overlays/<env>/...` (appset của project tự quét).
+- **Thêm project**: thêm `apps/<newproject>/...`, `bootstrap/<tier>/appprojects/<newproject>/appproject.yaml`, `bootstrap/<tier>/project-appsets/<newproject>/applicationset.yaml` (appset cha tự quét).
+
+## SealedSecret
+
+Repo test đặt `sealedSecret.enabled: false` (image `traefik/whoami`). Khi cần secret thật, bật lại và seal —
+scope `strict` gắn theo name+namespace, tên secret = `<release>-secret`:
+
+```bash
+./scripts/seal.sh mention-mate-dev mention-mate-app-dev-secret DB_PASSWORD=... API_KEY=...
+```
+
+### Workflow chi tiết
+
+```
+secret thô ──kubeseal + public key──► SealedSecret (ciphertext) ──commit main
+                                              │ ArgoCD sync
+                                              ▼
+                  controller (private key) giải mã ──► Secret thật ──► pod
+```
+
+1. Lấy public key từ cluster và seal secret:
+   ```bash
+   # secret-name = <release>-secret = {project}-{app}-{env}-secret
+   ./scripts/seal.sh mention-mate-dev mention-mate-app-dev-secret DB_PASSWORD=... API_KEY=...
+   ```
+2. Dán `encryptedData` vào `values.yaml`, đặt `sealedSecret.enabled: true`
+3. Commit lên `main` → ArgoCD sync → controller giải mã → Secret thật được tạo trong cluster
+
+### Lưu ý quan trọng
+
+> ⚠️ **scope `strict`** gắn cứng theo `name` + `namespace` — ciphertext **không dùng lại được** ở cluster khác hay namespace khác.
+>
+> ⚠️ **Mất private key của controller = mất mọi secret** → phải backup key thường xuyên:
+> ```bash
+> kubectl -n kube-system get secret \
+>   -l sealedsecrets.bitnami.com/sealed-secrets-key \
+>   -o yaml > sealed-secrets-master-key-backup.yaml
+> ```
+>
+> 💡 Giải pháp thay thế: **External Secrets**, **SOPS+age**, **Vault**.
+
+## ArgoCD
+
+Repo **public** → ArgoCD clone không cần creds. Mỗi cluster cần OCI cho kgateway:
+
+```bash
+argocd repo add cr.kgateway.dev/kgateway-dev/charts --type helm --enable-oci
+```
+
+ArgoCD **≥ 3.1** (native OCI Helm); lab pin **3.3.x**.
+
+### HTTPRoute đứng riêng (App `httproutes`)
+
+`bootstrap/<tier>/httproutes.yaml` GitOps hoá `platform/httproutes/` — các HTTPRoute **không** do chart
+`app` sinh, đều trỏ vào gateway **dùng chung** `shared-gw`. Hiện có route ArgoCD UI
+(`argocd.duongot.work` → `argocd-server`). Thêm route mới = thêm 1 manifest vào `platform/httproutes/`.
+
+- **`server.insecure` đặt THỦ CÔNG** (không GitOps), vì argocd-server đọc param lúc khởi động và cần restart:
+  ```bash
+  kubectl -n argocd patch configmap argocd-cmd-params-cm --type merge -p '{"data":{"server.insecure":"true"}}'
+  kubectl -n argocd rollout restart deploy argocd-server
+  ```
+- Vào ArgoCD qua NodePort của `shared-gw`: `kubectl -n kgateway-system get svc -l gateway.networking.k8s.io/gateway-name=shared-gw -o jsonpath='{.items[0].spec.ports[?(@.port==80)].nodePort}'`, rồi map DNS `argocd.duongot.work` → `nodeIP:nodePort`.
