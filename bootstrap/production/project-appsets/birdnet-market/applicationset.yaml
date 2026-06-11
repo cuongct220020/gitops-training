@@ -10,7 +10,7 @@ spec:
   goTemplateOptions: ["missingkey=error"]
   generators:
     - git:
-        repoURL: https://github.com/cuongct220020/vdt-cloud-training.git
+        repoURL: https://github.com/cuongct220020/gitops-training.git
         revision: main
         directories:
           - path: "apps/birdnet-market/*/overlays/prod"
@@ -24,13 +24,13 @@ spec:
     spec:
       project: '{{ index .path.segments 1 }}'
       sources:
-        - repoURL: https://github.com/cuongct220020/vdt-cloud-training.git
+        - repoURL: https://github.com/cuongct220020/gitops-training.git
           targetRevision: main
           path: 'helm-charts/app'
           helm:
             valueFiles:
               - '$values/{{ .path.path }}/values.yaml'
-        - repoURL: https://github.com/cuongct220020/vdt-cloud-training.git
+        - repoURL: https://github.com/cuongct220020/gitops-training.git
           targetRevision: main
           ref: values
       destination:

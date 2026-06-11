@@ -24,7 +24,7 @@ spec:
     spec:
       project: default
       source:
-        repoURL: https://github.com/cuongct220020/vdt-cloud-training.git
+        repoURL: https://github.com/cuongct220020/gitops-training.git
         targetRevision: main
         path: '{{ .path.path }}'
       destination:

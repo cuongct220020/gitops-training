@@ -10,7 +10,7 @@ spec:
   goTemplateOptions: ["missingkey=error"]
   generators:
     - git:
-        repoURL: https://github.com/cuongct220020/vdt-cloud-training.git
+        repoURL: https://github.com/cuongct220020/gitops-training.git
         revision: main
         directories:
           - path: "apps/mention-mate/*/overlays/dev"
