@@ -13,10 +13,10 @@ Single branch (`main`), directory-based. Tách **2 tier theo cluster**:
 
 ```
 root-<tier> (App, recurse:false → chỉ đọc 6 file cấp 1 của bootstrap/<tier>)
-├── appprojects    (appset) ──► App/appproject-<proj> ──► AppProject        (wave -2)
+├── app-projects    (appset) ──► App/app-project-<proj> ──► AppProject        (wave -2)
 ├── platform       (appset) ──► sealed-secrets + kgateway-crds (CRDs, có SSA) (wave -1)
 ├── kgateway       (App)    ──► kgateway controller (v2.4.0-main, KHÔNG SSA)  (wave 0)
-├── all-projects   (appset) ──► App/projectset-<proj> ──► appset của project (wave 0)
+├── project-appsets   (appset) ──► App/projectset-<proj> ──► appset của project (wave 0)
 │                                   └─► workload Application (theo env của tier)
 ├── shared-gateway (App)    ──► Gateway shared-gw (*.duongot.work, dùng chung) (wave 1)
 └── httproutes     (App)    ──► HTTPRoute đứng riêng (vd argocd) ──► shared-gw  (wave 2)
@@ -36,13 +36,13 @@ main
 ├── root-production.yaml             # apply lên ArgoCD cluster prod
 ├── bootstrap/
 │   ├── nonproduction/               # production/ = bản sao, chỉ khác env filter
-│   │   ├── appprojects.yaml          (appset)         ┐ 6 file cấp 1
+│   │   ├── app-projects.yaml         (appset)         ┐ 6 file cấp 1
 │   │   ├── platform.yaml             (appset)         │ (root đọc, recurse:false)
 │   │   ├── kgateway.yaml             (App)            │
-│   │   ├── all-projects.yaml         (appset)         │
+│   │   ├── project-appsets.yaml      (appset)         │
 │   │   ├── shared-gateway.yaml       (App)            │
 │   │   ├── httproutes.yaml           (App)            ┘
-│   │   ├── appprojects/{platform,birdnet-market,mention-mate}/appproject.yaml
+│   │   ├── app-projects/{platform,birdnet-market,mention-mate}/app-project.yaml
 │   │   └── project-appsets/{birdnet-market,mention-mate}/applicationset.yaml
 │   └── production/ ...
 ├── platform/gateway/               # shared-gw DÙNG CHUNG: GatewayParameters + Gateway *.duongot.work
@@ -83,7 +83,7 @@ Cấu trúc `components` đầy đủ: xem `helm-charts/app/values.yaml`.
 
 - **Thêm env**: tạo `apps/<project>/<app>/overlays/<env>/values.yaml` + thêm path env vào appset của project ở tier tương ứng.
 - **Thêm app**: tạo `apps/<project>/<newapp>/overlays/<env>/...` (appset của project tự quét).
-- **Thêm project**: thêm `apps/<newproject>/...`, `bootstrap/<tier>/appprojects/<newproject>/appproject.yaml`, `bootstrap/<tier>/project-appsets/<newproject>/applicationset.yaml` (appset cha tự quét).
+- **Thêm project**: thêm `apps/<newproject>/...`, `bootstrap/<tier>/app-projects/<newproject>/appproject.yaml`, `bootstrap/<tier>/project-appsets/<newproject>/applicationset.yaml` (appset cha tự quét).
 
 ## SealedSecret
 

@@ -1,9 +1,9 @@
-# App-of-Apps cho AppProject: appset quét bootstrap/nonproduction/appprojects/* -> mỗi project 1 App
+# App-of-Apps cho AppProject: appset quét bootstrap/production/app-projects/* -> mỗi project 1 App
 # deploy manifest AppProject (ApplicationSet chỉ sinh được Application).
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  name: appprojects
+  name: app-projects
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "-2"
@@ -15,7 +15,7 @@ spec:
         repoURL: https://github.com/cuongct220020/gitops-training.git
         revision: main
         directories:
-          - path: "bootstrap/nonproduction/appprojects/*"
+          - path: "bootstrap/production/app-projects/*"
   template:
     metadata:
       name: 'appproject-{{ .path.basename }}'
