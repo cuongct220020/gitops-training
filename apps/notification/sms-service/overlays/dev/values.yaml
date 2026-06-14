@@ -1,0 +1,11 @@
+components:
+  api:
+    image: { repository: traefik/whoami, tag: "v1.10.3" }
+    replicaCount: 1
+    port: 80
+    httpRoute:
+      enabled: true
+      hostnames: ["notification-sms-dev.cuongct.work"] # Đổi tương ứng -staging / -prod
+      pathPrefixes: ["/sms"]
+sealedSecret:
+  enabled: false
