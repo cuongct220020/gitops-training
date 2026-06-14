@@ -26,6 +26,7 @@
     * [Workflow chi tiết](#workflow-chi-tiết)
     * [Lưu ý quan trọng](#lưu-ý-quan-trọng)
 * [Debug / Troubleshooting](#debug--troubleshooting)
+* [Discussion](#discussion)
 
 ## Tổng quan
 Lab GitOps trên ArgoCD: **App-of-Apps + ApplicationSet** nhiều tầng, multi-source, **1 base Helm chart dùng chung**.
@@ -308,3 +309,9 @@ secret thô ──kubeseal + public key──► SealedSecret (ciphertext) ─�
 | **Workload Application không sinh** (appset stuck) | ProjectSet appset generator path sai, hoặc namespace chưa được tạo | Kiểm tra `apps/<project>/<app>/overlays/<env>/values.yaml` tồn tại; AppProject `namespace: <tier>-<env>` allow |
 | **destination not permitted** (AppProject reject) | AppProject permit namespace/cluster không match | AppProject `destinations.server: https://kubernetes.default.svc`, `namespaces: [<tier>-*]` |
 | **HTTPRoute không attach vào Gateway** | Gateway name sai, namespace sai, port mismatch | HTTPRoute `parentRefs.name: shared-gw`, namespace=kgateway-system, `sectionName: http` |
+
+## Discussion
+- Vì sao chỉ `root` app mới apply tay? 
+- Vì sao cấu hình `recurse: false` ở [root-nonproduction.yaml](root-nonproduction.yaml) / [root-production.yaml](root-production.yaml).
+- Vì sao CRDs dùng SSA còn controller thì không?
+- Vì sao 2 source (source 1: helm-chart/apps, source 2: các file `values.yaml`) phải cùng trên một nhánh `main`?
