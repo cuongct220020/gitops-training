@@ -19,6 +19,27 @@ Single branch (`main`), directory-based. Tách **2 tier theo cluster**:
 | **argocd-server** | API + Web UI + auth (SSO/Dex) |
 | **redis** | Cache trạng thái/manifest |
 
+### Flow
+
+```
+Git/OCI Repo
+  │
+  ▼ (egress)
+repo-server ─── clone + render
+  │
+  ▼
+app-controller ◄─┬─── so desired vs live (K8s API)
+  │              │
+  ├─ sync ──────► K8s API ──► workloads (live state)
+  │              
+  ├─► redis ◄─┐ (cache status/manifest)
+  │           │
+  └──────────► argocd-server (UI + API)
+                 │
+                 ▼
+               User (browser)
+```
+
 **Lab**: mỗi cluster có 1 ArgoCD riêng, destination = in-cluster. repo-server cần egress để pull OCI/Git.
 
 
@@ -65,9 +86,9 @@ Promotion = PR dổi file overlay, tất cả trên 1 branch.
 - ✅ Phù hợp team kỹ thuật chung với central governance (AppProject + RBAC)
 
 ## Bootstrap (Cluster Setup)
+![alt text](image.png)
 
 ### Bootstrap Flow
-
 ```bash
 kubectl apply root-<tier>.yaml (1 lần / cluster)
   │ recurse:false → đọc 6 file cấp 1 của bootstrap/<tier>/
