@@ -18,7 +18,7 @@ spec:
           - path: "bootstrap/production/project-appsets/*"
   template:
     metadata:
-      name: 'projectset-{{ .path.basename }}'
+      name: 'projectappsets-{{ .path.basename }}'
       annotations:
         argocd.argoproj.io/sync-wave: "0"
     spec:
