@@ -214,7 +214,8 @@ kubectl -n kgateway-system get svc -l gateway.networking.k8s.io/gateway-name=sha
 # Map DNS: argocd.cuongct.work → <nodeIP>:<nodePort>
 ```
 
-## Base chart `app`
+## Development
+### Base chart `app`
 
 1 chart cho mọi app, render theo map `components`:
 
@@ -225,13 +226,13 @@ kubectl -n kgateway-system get svc -l gateway.networking.k8s.io/gateway-name=sha
 Mỗi workload Application multi-source, **cả hai cùng `main`**: `source[0]` = `helm-charts/app`, `source[1]` = `values.yaml` của env (`$values`).
 Cấu trúc `components` đầy đủ: xem `helm-charts/app/values.yaml`.
 
-## Thêm mới
+### Thêm mới
 
 - **Thêm env**: tạo `apps/<project>/<app>/overlays/<env>/values.yaml` + thêm path env vào appset của project ở tier tương ứng.
 - **Thêm app**: tạo `apps/<project>/<newapp>/overlays/<env>/...` (appset của project tự quét).
 - **Thêm project**: thêm `apps/<newproject>/...`, `bootstrap/<tier>/app-projects/<newproject>/appproject.yaml`, `bootstrap/<tier>/project-appsets/<newproject>/applicationset.yaml` (appset cha tự quét).
 
-## SealedSecret
+### SealedSecret
 
 Repo test đặt `sealedSecret.enabled: false` (image `traefik/whoami`). Khi cần secret thật, bật lại và seal —
 scope `strict` gắn theo name+namespace, tên secret = `<release>-secret`:
@@ -240,7 +241,7 @@ scope `strict` gắn theo name+namespace, tên secret = `<release>-secret`:
 ./scripts/seal.sh mention-mate-dev mention-mate-app-dev-secret DB_PASSWORD=... API_KEY=...
 ```
 
-### Workflow chi tiết
+#### Workflow chi tiết
 
 ```
 secret thô ──kubeseal + public key──► SealedSecret (ciphertext) ──commit main
@@ -257,7 +258,7 @@ secret thô ──kubeseal + public key──► SealedSecret (ciphertext) ─�
 2. Dán `encryptedData` vào `values.yaml`, đặt `sealedSecret.enabled: true`
 3. Commit lên `main` → ArgoCD sync → controller giải mã → Secret thật được tạo trong cluster
 
-### Lưu ý quan trọng
+#### Lưu ý quan trọng
 
 > ⚠️ **scope `strict`** gắn cứng theo `name` + `namespace` — ciphertext **không dùng lại được** ở cluster khác hay namespace khác.
 >
