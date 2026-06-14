@@ -6,7 +6,7 @@ components:
     port: 80
     httpRoute:
       enabled: true
-      hostnames: ["mention-mate-app-staging.duongot.work"]
+      hostnames: ["mention-mate-app-staging.cuongct.work"]
       pathPrefixes: ["/api"]
   worker:
     image: { repository: traefik/whoami, tag: "v1.10.3" }

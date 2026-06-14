@@ -8,7 +8,7 @@ components:
     port: 80
     httpRoute:
       enabled: true
-      hostnames: ["birdnet-market-frontend-staging.duongot.work"]
+      hostnames: ["birdnet-market-frontend-staging.cuongct.work"]
       pathPrefixes: ["/"]
 sealedSecret:
   enabled: false        # repo test: bỏ secret để pod chạy ngay (không cần kubeseal)

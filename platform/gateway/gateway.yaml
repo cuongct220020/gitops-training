@@ -1,6 +1,6 @@
 # Gateway dùng chung cho mọi HTTPRoute (kgateway). Mỗi app chỉ tạo HTTPRoute trỏ vào đây.
 # - infrastructure.parametersRef -> GatewayParameters (service NodePort).
-# - listener hostname "*.duongot.work": chỉ route có hostname thuộc domain này mới attach.
+# - listener hostname "*.cuongct.work": chỉ route có hostname thuộc domain này mới attach.
 # - allowedRoutes.from: All -> route ở namespace khác vẫn attach (parentRef cross-ns).
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
@@ -20,7 +20,7 @@ spec:
     - name: http
       protocol: HTTP
       port: 80
-      hostname: "*.duongot.work"
+      hostname: "*.cuongct.work"
       allowedRoutes:
         namespaces:
           from: All

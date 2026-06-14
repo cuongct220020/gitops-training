@@ -1,5 +1,5 @@
 # NodePort CỐ ĐỊNH 30080 cho shared-gw -> HAProxy trỏ ổn định: HAProxy terminate TLS rồi
-# forward http tới <nodeIP>:30080 (giữ Host header) -> shared-gw route theo *.duongot.work.
+# forward http tới <nodeIP>:30080 (giữ Host header) -> shared-gw route theo *.cuongct.work.
 #
 # Service PHỤ, chọn đúng pod proxy của shared-gw. kgateway vẫn tự tạo 1 service NodePort động
 # (giữ nguyên làm fallback) -> thêm service này là ADDITIVE, không phá gateway nếu selector lệch.

@@ -18,7 +18,7 @@ root-<tier> (App, recurse:false → chỉ đọc 6 file cấp 1 của bootstrap/
 ├── kgateway       (App)    ──► kgateway controller (v2.4.0-main, KHÔNG SSA)  (wave 0)
 ├── project-appsets   (appset) ──► App/projectset-<proj> ──► appset của project (wave 0)
 │                                   └─► workload Application (theo env của tier)
-├── shared-gateway (App)    ──► Gateway shared-gw (*.duongot.work, dùng chung) (wave 1)
+├── shared-gateway (App)    ──► Gateway shared-gw (*.cuongct.work, dùng chung) (wave 1)
 └── httproutes     (App)    ──► HTTPRoute đứng riêng (vd argocd) ──► shared-gw  (wave 2)
 ```
 
@@ -45,9 +45,9 @@ main
 │   │   ├── app-projects/{platform,birdnet-market,mention-mate}/app-project.yaml
 │   │   └── project-appsets/{birdnet-market,mention-mate}/applicationset.yaml
 │   └── production/ ...
-├── platform/gateway/               # shared-gw DÙNG CHUNG: GatewayParameters + Gateway *.duongot.work
+├── platform/gateway/               # shared-gw DÙNG CHUNG: GatewayParameters + Gateway *.cuongct.work
 ├── platform/httproutes/            # HTTPRoute đứng riêng (argocd...) trỏ shared-gw
-├── helm-charts/app/                 # 1 base chart duy nhất
+├── helm-charts/app/                # 1 base chart duy nhất
 └── apps/<project>/<app>/overlays/<env>/values.yaml
 ```
 
@@ -138,11 +138,11 @@ ArgoCD **≥ 3.1** (native OCI Helm); lab pin **3.3.x**.
 
 `bootstrap/<tier>/httproutes.yaml` GitOps hoá `platform/httproutes/` — các HTTPRoute **không** do chart
 `app` sinh, đều trỏ vào gateway **dùng chung** `shared-gw`. Hiện có route ArgoCD UI
-(`argocd.duongot.work` → `argocd-server`). Thêm route mới = thêm 1 manifest vào `platform/httproutes/`.
+(`argocd.cuongct.work` → `argocd-server`). Thêm route mới = thêm 1 manifest vào `platform/httproutes/`.
 
 - **`server.insecure` đặt THỦ CÔNG** (không GitOps), vì argocd-server đọc param lúc khởi động và cần restart:
   ```bash
   kubectl -n argocd patch configmap argocd-cmd-params-cm --type merge -p '{"data":{"server.insecure":"true"}}'
   kubectl -n argocd rollout restart deploy argocd-server
   ```
-- Vào ArgoCD qua NodePort của `shared-gw`: `kubectl -n kgateway-system get svc -l gateway.networking.k8s.io/gateway-name=shared-gw -o jsonpath='{.items[0].spec.ports[?(@.port==80)].nodePort}'`, rồi map DNS `argocd.duongot.work` → `nodeIP:nodePort`.
+- Vào ArgoCD qua NodePort của `shared-gw`: `kubectl -n kgateway-system get svc -l gateway.networking.k8s.io/gateway-name=shared-gw -o jsonpath='{.items[0].spec.ports[?(@.port==80)].nodePort}'`, rồi map DNS `argocd.cuongct.work` → `nodeIP:nodePort`.
