@@ -1,0 +1,13 @@
+components:
+  app:
+    image:
+      repository: traefik/whoami
+      tag: "v1.10.3"
+    replicaCount: 1
+    port: 80
+    httpRoute:
+      enabled: true
+      hostnames: ["birdnet-market-pipeline-staging.cuongct.work"] # Sửa thành -staging hoặc -prod tùy file
+      pathPrefixes: ["/pipeline"]
+sealedSecret:
+  enabled: false
