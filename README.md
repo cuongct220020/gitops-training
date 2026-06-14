@@ -1,5 +1,33 @@
 # Gitops Training Labs
 
+## Mục lục
+
+* [Tổng quan](#tổng-quan)
+* [Kiến trúc ArgoCD](#kiến-trúc-argocd)
+  * [Flow Diagram](#flow-diagram)
+* [Cấu trúc thư mục](#cấu-trúc-thư-mục)
+* [Design Pattern: Directory-based GitOps](#design-pattern-directory-based-gitops)
+  * [Trade-off](#trade-off)
+* [Bootstrap (Cluster Setup)](#bootstrap-cluster-setup)
+  * [Bootstrap Flow](#bootstrap-flow)
+  * [E2E Setup](#e2e-setup)
+    * [1. Tạo cluster](#1-tạo-cluster)
+    * [2. Cài đặt Gateway API CRDs](#2-cài-đặt-gateway-api-crds)
+    * [3. Cài đặt ArgoCD](#3-cài-đặt-argocd)
+    * [4. Thêm Helm OCI repository cho kgateway](#4-thêm-helm-oci-repository-cho-kgateway)
+    * [5. Apply root ApplicationSet cho cả 2 tier](#5-apply-root-applicationset-cho-cả-2-tier)
+    * [6. Lấy admin password](#6-lấy-admin-password)
+    * [7. Port-forward để truy cập ArgoCD UI](#7-port-forward-để-truy-cập-argocd-ui)
+    * [8. Tìm NodePort để truy cập qua Gateway](#8-tìm-nodeport-để-truy-cập-qua-gateway)
+* [Development](#development)
+  * [Base chart `app`](#base-chart-app)
+  * [Thêm mới](#thêm-mới)
+  * [SealedSecret](#sealedsecret)
+    * [Workflow chi tiết](#workflow-chi-tiết)
+    * [Lưu ý quan trọng](#lưu-ý-quan-trọng)
+* [Debug / Troubleshooting](#debug--troubleshooting)
+
+## Tổng quan
 Lab GitOps trên ArgoCD: **App-of-Apps + ApplicationSet** nhiều tầng, multi-source, **1 base Helm chart dùng chung**.
 Single branch (`main`), directory-based. Tách **2 tier theo cluster**:
 
