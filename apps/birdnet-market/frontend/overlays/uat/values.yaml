@@ -1,0 +1,14 @@
+# apps/birdnet-market/frontend/overlays/uat/values.yaml
+components:
+  app:
+    image:
+      repository: traefik/whoami
+      tag: "v1.10.3"
+    replicaCount: 2
+    port: 80
+    httpRoute:
+      enabled: true
+      hostnames: ["birdnet-market-frontend-uat.cuongct.work"]
+      pathPrefixes: ["/"]
+sealedSecret:
+  enabled: false
