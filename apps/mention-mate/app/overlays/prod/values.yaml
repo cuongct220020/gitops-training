@@ -11,5 +11,8 @@ components:
   worker:
     image: { repository: traefik/whoami, tag: "v1.10.3" }
     replicaCount: 3
+  scheduler:
+    image: { repository: traefik/whoami, tag: "v1.10.3" }
+    replicaCount: 3
 sealedSecret:
   enabled: false        # repo test: bỏ secret để pod chạy ngay (không cần kubeseal)
