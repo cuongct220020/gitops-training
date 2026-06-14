@@ -19,25 +19,29 @@ Single branch (`main`), directory-based. Tách **2 tier theo cluster**:
 | **argocd-server** | API + Web UI + auth (SSO/Dex) |
 | **redis** | Cache trạng thái/manifest |
 
-### Flow
+### Flow Diagram
 
-```
-Git/OCI Repo
-  │
-  ▼ (egress)
-repo-server ─── clone + render
-  │
-  ▼
-app-controller ◄─┬─── so desired vs live (K8s API)
-  │              │
-  ├─ sync ──────► K8s API ──► workloads (live state)
-  │              
-  ├─► redis ◄─┐ (cache status/manifest)
-  │           │
-  └──────────► argocd-server (UI + API)
-                 │
-                 ▼
-               User (browser)
+```mermaid
+graph LR
+    Git["🗂️ Git/OCI<br/>Repo"]
+    RepoServer["📦 repo-server<br/>clone + render"]
+    AppCtrl["⚙️ app-controller<br/>reconciliation"]
+    K8sAPI["☸️ K8s API<br/>apply"]
+    Live["✅ Live State<br/>workloads"]
+    ArgoUI["🖥️ argocd-server<br/>UI + API"]
+    Redis["🔴 redis<br/>cache"]
+    User["👤 User"]
+    
+    Git -->|egress| RepoServer
+    RepoServer -->|desired state| AppCtrl
+    AppCtrl -->|compare| K8sAPI
+    K8sAPI -->|apply| Live
+    AppCtrl -->|status| Redis
+    Redis -->|read| AppCtrl
+    ArgoUI -->|query| Redis
+    ArgoUI -->|sync trigger| AppCtrl
+    User -->|browser| ArgoUI
+    Live -.->|health| AppCtrl
 ```
 
 **Lab**: mỗi cluster có 1 ArgoCD riêng, destination = in-cluster. repo-server cần egress để pull OCI/Git.
