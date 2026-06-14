@@ -9,24 +9,66 @@ Single branch (`main`), directory-based. Tách **2 tier theo cluster**:
 > Mỗi cluster có ArgoCD riêng (per-cluster), mọi destination = in-cluster. 2 tier giống hệt nhau,
 > chỉ khác **env filter** (nonproduction = dev+staging, production = prod).
 
-## Phân tầng & Bootstrap Flow (mỗi tier)
+## Kiến trúc ArgoCD
 
-### Cấu trúc 6 components
+| Thành phần | Vai trò |
+|---|---|
+| **application-controller** | Reconciliation (so desired vs live), sync, health check |
+| **repo-server** | Clone repo, render manifest. Nút thắt → cần scale + cache khi repo lớn |
+| **applicationset-ctrl** | Sinh Application từ generator |
+| **argocd-server** | API + Web UI + auth (SSO/Dex) |
+| **redis** | Cache trạng thái/manifest |
 
+**Lab**: mỗi cluster có 1 ArgoCD riêng, destination = in-cluster. repo-server cần egress để pull OCI/Git.
+
+
+## Cấu trúc thư mục
 ```
-root-<tier> (App, recurse:false → chỉ đọc 6 file cấp 1 của bootstrap/<tier>)
-├── app-projects    (appset) ──► App/app-project-<proj> ──► AppProject        (wave -2)
-├── platform       (appset) ──► sealed-secrets + kgateway-crds (CRDs, có SSA) (wave -1)
-├── kgateway       (App)    ──► kgateway controller (v2.4.0-main, KHÔNG SSA)  (wave 0)
-├── project-appsets   (appset) ──► App/projectset-<proj> ──► appset của project (wave 0)
-│                                   └─► workload Application (theo env của tier)
-├── shared-gateway (App)    ──► Gateway shared-gw (*.cuongct.work, dùng chung) (wave 1)
-└── httproutes     (App)    ──► HTTPRoute đứng riêng (vd argocd) ──► shared-gw  (wave 2)
+main
+├── root-nonproduction.yaml          # apply lên ArgoCD cluster nonprod
+├── root-production.yaml             # apply lên ArgoCD cluster prod
+├── bootstrap/
+│   ├── nonproduction/               # production/ = bản sao, chỉ khác env filter
+│   │   ├── app-projects.yaml         (appset)         ┐ 6 file cấp 1
+│   │   ├── platform.yaml             (appset)         │ (root đọc, recurse:false)
+│   │   ├── kgateway.yaml             (App)            │
+│   │   ├── project-appsets.yaml      (appset)         │
+│   │   ├── shared-gateway.yaml       (App)            │
+│   │   ├── httproutes.yaml           (App)            ┘
+│   │   ├── app-projects/{platform,birdnet-market,mention-mate}/app-project.yaml
+│   │   └── project-appsets/{birdnet-market,mention-mate}/applicationset.yaml
+│   └── production/ ...
+├── platform/gateway/               # shared-gw DÙNG CHUNG: GatewayParameters + Gateway *.cuongct.work
+├── platform/httproutes/            # HTTPRoute đứng riêng (argocd...) trỏ shared-gw
+├── helm-charts/app/                # 1 base chart duy nhất
+└── apps/<project>/<app>/overlays/<env>/values.yaml
 ```
+
+## Design Pattern: Directory-based GitOps
+
+Lab dùng **single branch + directory-based overlays** — mỗi env (dev/staging/prod) là 1 thư mục `overlays/<env>`. 
+Promotion = PR dổi file overlay, tất cả trên 1 branch.
+
+### Trade-off
+
+| Pattern | ✅ Ưu điểm | ❌ Nhược điểm | Phù hợp |
+|---|---|---|---|
+| **Directory-based** | Dễ review (diff nhỏ), quản lý unified, tái sử dụng Helm/Kustomize base | Repo lớn, CI chậy nếu không filter, khó enforce per-team permission | Multi-app, team chung, promotion controlled |
+| **Monorepo** | Atomic commit (toàn bộ service), CI unified, dễ refactor | Khó phân chia responsibility, GitOps per-service phức tạp, secret collision | Big company (Google, Meta) nhiều service |
+| **Polyrepo** | Full autonomy, tách biệt rõ ràng, per-team ownership | Promotion across repos phức tạp, sync khó, many credentials | Microservice lớn, teams độc lập |
+| **Single Repo Single App** | Simple, clear ownership | Không scale, mỗi app tạo mới, khó shared configs | Startup, small team, mỗi app/team làm riêng |
+
+**Lab chọn directory-based vì:**
+- ✅ Quản lý unified (2 tier, multi-project, mỗi tier dùng chung 1 base chart)
+- ✅ Overlay dễ review + promote (kustomize/helm overlay tự nhiên match directory structure)
+- ✅ ApplicationSet quét overlays → tự động scale khi thêm app/env
+- ✅ Phù hợp team kỹ thuật chung với central governance (AppProject + RBAC)
+
+## Bootstrap (Cluster Setup)
 
 ### Bootstrap Flow
 
-```
+```bash
 kubectl apply root-<tier>.yaml (1 lần / cluster)
   │ recurse:false → đọc 6 file cấp 1 của bootstrap/<tier>/
   ▼
@@ -54,78 +96,12 @@ workload {project}-{app}-{env} (multi-source, cả 2 sources = main)
 > ApplicationSet chỉ sinh được **Application**, nên "appset quản lý AppProject / quản lý appset con"
 > đều dùng App-of-Apps gián tiếp: appset → App → (AppProject | ApplicationSet) manifest.
 
-## Design Pattern: Directory-based GitOps
 
-Lab dùng **single branch + directory-based overlays** — mỗi env (dev/staging/prod) là 1 thư mục `overlays/<env>`. 
-Promotion = PR dổi file overlay, tất cả trên 1 branch.
-
-### So sánh pattern
-
-| Tiêu chí | **Directory-based** (Lab) | **Monorepo** | **Polyrepo** | **Single Repo Single App** |
-|---|---|---|---|---|
-| **Cấu trúc** | 1 repo, many apps, `overlays/<env>/values.yaml` | 1 repo, mọi service, thư mục chia theo domain | 1 app/service = 1 repo | 1 app = 1 repo, một source of truth |
-| **Promotion** | PR dổi file overlay (kustomize/helm) | PR trên file manifests | Git tag / branch switch | Branch-based (main, staging, prod) |
-| **Env separation** | Directory separate, code shared | Code shared, versioning riêng per service | Hoàn toàn tách biệt | Branch tách biệt |
-| **Scaling apps** | Quét `apps/<proj>/<app>/overlays/<env>` (ApplicationSet) | Thêm dir → CI auto detect | Mỗi app tạo 1 repo | Tương tự polyrepo |
-| **Approval flow** | Review overlay changes (minimal diff) | Review toàn bộ change | Per-repo approval | Per-app approval |
-| **Secret management** | 1 SealedSecret per app/env (scoped) | Scaling → many secrets | Per-repo key setup | 1 secret per app |
-
-### Trade-off
-
-| Pattern | ✅ Ưu điểm | ❌ Nhược điểm | Phù hợp |
-|---|---|---|---|
-| **Directory-based** | Dễ review (diff nhỏ), quản lý unified, tái sử dụng Helm/Kustomize base | Repo lớn, CI chậy nếu không filter, khó enforce per-team permission | Multi-app, team chung, promotion controlled |
-| **Monorepo** | Atomic commit (toàn bộ service), CI unified, dễ refactor | Khó phân chia responsibility, GitOps per-service phức tạp, secret collision | Big company (Google, Meta) nhiều service |
-| **Polyrepo** | Full autonomy, tách biệt rõ ràng, per-team ownership | Promotion across repos phức tạp, sync khó, many credentials | Microservice lớn, teams độc lập |
-| **Single Repo Single App** | Simple, clear ownership | Không scale, mỗi app tạo mới, khó shared configs | Startup, small team, mỗi app/team làm riêng |
-
-**Lab chọn directory-based vì:**
-- ✅ Quản lý unified (2 tier, multi-project, mỗi tier dùng chung 1 base chart)
-- ✅ Overlay dễ review + promote (kustomize/helm overlay tự nhiên match directory structure)
-- ✅ ApplicationSet quét overlays → tự động scale khi thêm app/env
-- ✅ Phù hợp team kỹ thuật chung với central governance (AppProject + RBAC)
-
-## Cấu trúc thư mục
-
-```
-main
-├── root-nonproduction.yaml          # apply lên ArgoCD cluster nonprod
-├── root-production.yaml             # apply lên ArgoCD cluster prod
-├── bootstrap/
-│   ├── nonproduction/               # production/ = bản sao, chỉ khác env filter
-│   │   ├── app-projects.yaml         (appset)         ┐ 6 file cấp 1
-│   │   ├── platform.yaml             (appset)         │ (root đọc, recurse:false)
-│   │   ├── kgateway.yaml             (App)            │
-│   │   ├── project-appsets.yaml      (appset)         │
-│   │   ├── shared-gateway.yaml       (App)            │
-│   │   ├── httproutes.yaml           (App)            ┘
-│   │   ├── app-projects/{platform,birdnet-market,mention-mate}/app-project.yaml
-│   │   └── project-appsets/{birdnet-market,mention-mate}/applicationset.yaml
-│   └── production/ ...
-├── platform/gateway/               # shared-gw DÙNG CHUNG: GatewayParameters + Gateway *.cuongct.work
-├── platform/httproutes/            # HTTPRoute đứng riêng (argocd...) trỏ shared-gw
-├── helm-charts/app/                # 1 base chart duy nhất
-└── apps/<project>/<app>/overlays/<env>/values.yaml
-```
-
-## Kiến trúc ArgoCD
-
-| Thành phần | Vai trò |
-|---|---|
-| **application-controller** | Reconciliation (so desired vs live), sync, health check |
-| **repo-server** | Clone repo, render manifest. Nút thắt → cần scale + cache khi repo lớn |
-| **applicationset-ctrl** | Sinh Application từ generator |
-| **argocd-server** | API + Web UI + auth (SSO/Dex) |
-| **redis** | Cache trạng thái/manifest |
-
-**Lab**: mỗi cluster có 1 ArgoCD riêng, destination = in-cluster. repo-server cần egress để pull OCI/Git.
-
-
-## Bootstrap (Setup)
+### E2E Setup
 
 **Lab dùng `kind`** (Kubernetes In Docker): chạy K8s trong Docker, nhanh để dev/test. **Production** thay thế: **EKS/GKE/AKS** (cloud managed), **kubeadm** (on-prem), **kubespray** (Ansible, multi-cloud).
 
-### 1. Tạo cluster
+#### 1. Tạo cluster
 
 ```bash
 # Tạo 2 cluster: nonproduction (dev+staging) và production (prod)
@@ -139,14 +115,14 @@ kubectl config get-contexts
 # kubectl config use-context kind-production
 ```
 
-### 2. Cài đặt Gateway API CRDs
+#### 2. Cài đặt Gateway API CRDs
 
 ```bash
 # Cần thiết cho kgateway controller
 kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.5.1/standard-install.yaml
 ```
 
-### 3. Cài đặt ArgoCD
+#### 3. Cài đặt ArgoCD
 
 ```bash
 # Tạo namespace argocd
@@ -161,7 +137,7 @@ kubectl -n argocd patch configmap argocd-cmd-params-cm --type merge -p '{"data":
 kubectl -n argocd rollout restart deploy argocd-server
 ```
 
-### 4. Thêm Helm OCI repository cho kgateway
+#### 4. Thêm Helm OCI repository cho kgateway
 
 ```bash
 # Repo public, ArgoCD clone không cần creds
@@ -169,7 +145,7 @@ kubectl -n argocd rollout restart deploy argocd-server
 argocd repo add cr.kgateway.dev/kgateway-dev/charts --type helm --enable-oci
 ```
 
-### 5. Apply root ApplicationSet cho cả 2 tier
+#### 5. Apply root ApplicationSet cho cả 2 tier
 
 ```bash
 # Trên cluster nonproduction (dev + staging)
@@ -181,14 +157,14 @@ kubectl config use-context kind-production
 kubectl apply -f root-production.yaml
 ```
 
-### 6. Lấy admin password
+#### 6. Lấy admin password
 
 ```bash
 # Giải mã password admin của ArgoCD
 kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 --decode; echo
 ```
 
-### 7. Port-forward để truy cập ArgoCD UI
+#### 7. Port-forward để truy cập ArgoCD UI
 
 ```bash
 # Trên cluster nonproduction (port 9090)
@@ -203,7 +179,7 @@ kubectl -n argocd port-forward svc/argocd-server 9091:80
 ArgoCD UI sẽ expose qua shared Gateway `shared-gw` tại `argocd.cuongct.work` (cần map DNS → NodePort) 
 hoặc qua port-forward ở trên.
 
-### 8. Tìm NodePort để truy cập qua Gateway
+#### 8. Tìm NodePort để truy cập qua Gateway
 
 ```bash
 # Lấy NodePort của shared-gw (default port 80)
